@@ -15,6 +15,26 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Ensure Comment powerup exists
   await ensureCommentPowerup(plugin);
 
+  // Helper function to check if comments widget is actually open
+  const isCommentsWidgetActuallyOpen = async (): Promise<boolean> => {
+    try {
+      // Try to get information about open widgets
+      // This is a more reliable way to check if the widget is actually open
+      const openWidgets = await plugin.window.getOpenWidgets?.() || [];
+      const isOpen = openWidgets.some((widget: any) => widget.widgetId === 'comments_sidebar');
+      
+      // Update our stored state to match reality
+      await plugin.storage.setSession('comments_widget_open', isOpen);
+      
+      return isOpen;
+    } catch (error) {
+      // Fallback: if we can't check, assume it's closed and let the user try
+      console.log('Could not check widget state, assuming closed:', error);
+      await plugin.storage.setSession('comments_widget_open', false);
+      return false;
+    }
+  };
+
   // A command that inserts text into the editor if focused.
   // Sidebar button to open Comments sidebar
   await plugin.app.registerSidebarButton({
@@ -35,12 +55,20 @@ async function onActivate(plugin: ReactRNPlugin) {
       await plugin.storage.setSession('comments_last_click', now);
       console.log('Click allowed, proceeding...');
 
-      // Check if we're already in the process of opening or if it's open
-      const commentsOpen = await plugin.storage.getSession<boolean>('comments_widget_open');
+      // Check if we're already in the process of opening
       const commentsOpening = await plugin.storage.getSession<boolean>('comments_widget_opening');
-      console.log('Comments open:', commentsOpen, 'Comments opening:', commentsOpening);
+      console.log('Comments opening:', commentsOpening);
 
-      if (commentsOpen || commentsOpening) {
+      if (commentsOpening) {
+        console.log('Already opening - ignoring click');
+        return;
+      }
+
+      // Check if the widget is actually open (more reliable check)
+      const isActuallyOpen = await isCommentsWidgetActuallyOpen();
+      console.log('Comments actually open:', isActuallyOpen);
+
+      if (isActuallyOpen) {
         console.log('Comments already open - sending flash signal');
         // Send a flash signal to the Comments widget to provide visual feedback
         await plugin.storage.setSession('comments_flash_signal', Date.now());
@@ -82,10 +110,13 @@ async function onActivate(plugin: ReactRNPlugin) {
       }
       await plugin.storage.setSession('comments_last_click', now);
 
-      const commentsOpen = await plugin.storage.getSession<boolean>('comments_widget_open');
       const commentsOpening = await plugin.storage.getSession<boolean>('comments_widget_opening');
+      if (commentsOpening) {
+        return;
+      }
 
-      if (commentsOpen || commentsOpening) {
+      const isActuallyOpen = await isCommentsWidgetActuallyOpen();
+      if (isActuallyOpen) {
         await plugin.storage.setSession('comments_flash_signal', Date.now());
         return;
       }
