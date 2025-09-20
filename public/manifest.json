@@ -1,0 +1,22 @@
+{
+  "manifestVersion": 1,
+  "id": "comments-plugin",
+  "name": "Comments",
+  "author": "Sukarth",
+  "repoUrl": "https://github.com/Sukarth",
+  "version": {
+    "major": 0,
+    "minor": 0,
+    "patch": 1
+  },
+  "theme": [],
+  "enableOnMobile": false,
+  "description": "Add comments to Rems and view/navigate them from a sidebar.",
+  "requestNative": true,
+  "requiredScopes": [
+    {
+      "type": "All",
+      "level": "ReadCreateModifyDelete"
+    }
+  ]
+}
