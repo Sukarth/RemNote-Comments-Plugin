@@ -61,6 +61,27 @@ function CommentsSidebar() {
         };
     }, [plugin]);
 
+    // Periodic state verification - double-check our state is correct
+    React.useEffect(() => {
+        const stateVerificationInterval = setInterval(async () => {
+            try {
+                // If this component is running, the widget should definitely be marked as open
+                const currentState = await plugin.storage.getSession<boolean>('comments_widget_open');
+                if (!currentState) {
+                    // If for some reason our state got out of sync, fix it
+                    console.log('State verification: fixing widget state to open');
+                    await plugin.storage.setSession('comments_widget_open', true);
+                }
+                // Always clear the opening flag if it's somehow still set
+                await plugin.storage.setSession('comments_widget_opening', false);
+            } catch (error) {
+                console.log('State verification error:', error);
+            }
+        }, 2000); // Check every 2 seconds
+
+        return () => clearInterval(stateVerificationInterval);
+    }, [plugin]);
+
     // Listen for flash signals from the button
     React.useEffect(() => {
         let lastFlashTime = 0;
@@ -139,4 +160,3 @@ function CommentsSidebar() {
 }
 
 renderWidget(CommentsSidebar);
-
