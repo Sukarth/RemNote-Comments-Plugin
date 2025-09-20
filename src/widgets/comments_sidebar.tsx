@@ -46,6 +46,60 @@ function CommentsSidebar() {
         };
     }, [plugin]);
 
+    // Listen for real-time comment updates
+    React.useEffect(() => {
+        const bus = createBus();
+        
+        const onCommentsUpdated = (data: any) => {
+            console.log('Received comment update:', data);
+            
+            if (typeof data === 'string') {
+                // Legacy format (just remId) - trigger refresh
+                console.log('Legacy format detected, triggering refresh');
+                setLastUpdate(Date.now());
+            } else if (data && data.comment) {
+                // New format with complete comment data
+                console.log('New comment data received, triggering immediate refresh');
+                // Force a refresh to show the new comment immediately
+                setLastUpdate(Date.now());
+            } else {
+                // Fallback - trigger refresh
+                console.log('Unknown format, triggering refresh');
+                setLastUpdate(Date.now());
+            }
+        };
+
+        bus.on('comments:updated', onCommentsUpdated);
+        
+        return () => {
+            bus.off('comments:updated', onCommentsUpdated);
+            bus.close();
+        };
+    }, []);
+
+    // Listen for session storage changes (backward compatibility)
+    React.useEffect(() => {
+        let lastDirtyTime = 0;
+        
+        const checkDirtyFlag = async () => {
+            try {
+                const dirtyTime = await plugin.storage.getSession<number>('comments_dirty') || 0;
+                if (dirtyTime > lastDirtyTime) {
+                    lastDirtyTime = dirtyTime;
+                    console.log('Session storage dirty flag detected, refreshing');
+                    setLastUpdate(Date.now());
+                }
+            } catch (error) {
+                // Ignore errors
+            }
+        };
+        
+        // Check every 500ms for session storage changes
+        const interval = setInterval(checkDirtyFlag, 500);
+        
+        return () => clearInterval(interval);
+    }, [plugin]);
+
     // Instant ping/pong system for widget detection
     React.useEffect(() => {
         const bus = createBus();
