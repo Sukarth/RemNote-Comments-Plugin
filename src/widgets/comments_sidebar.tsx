@@ -61,25 +61,35 @@ function CommentsSidebar() {
         };
     }, [plugin]);
 
-    // Periodic state verification - double-check our state is correct
+    // Heartbeat system - send periodic heartbeats to indicate the widget is alive
     React.useEffect(() => {
-        const stateVerificationInterval = setInterval(async () => {
+        const sendHeartbeat = async () => {
             try {
-                // If this component is running, the widget should definitely be marked as open
-                const currentState = await plugin.storage.getSession<boolean>('comments_widget_open');
-                if (!currentState) {
-                    // If for some reason our state got out of sync, fix it
-                    console.log('State verification: fixing widget state to open');
-                    await plugin.storage.setSession('comments_widget_open', true);
-                }
-                // Always clear the opening flag if it's somehow still set
-                await plugin.storage.setSession('comments_widget_opening', false);
+                const now = Date.now();
+                await plugin.storage.setSession('comments_widget_heartbeat', now);
+                console.log('Heartbeat sent:', now);
             } catch (error) {
-                console.log('State verification error:', error);
+                console.log('Heartbeat error:', error);
             }
-        }, 2000); // Check every 2 seconds
+        };
 
-        return () => clearInterval(stateVerificationInterval);
+        // Send initial heartbeat
+        sendHeartbeat();
+
+        // Send heartbeat every 2 seconds
+        const heartbeatInterval = setInterval(sendHeartbeat, 2000);
+
+        return () => {
+            clearInterval(heartbeatInterval);
+            // Clear heartbeat when component unmounts so button knows widget is gone
+            (async () => {
+                try {
+                    await plugin.storage.setSession('comments_widget_heartbeat', 0);
+                } catch (error) {
+                    console.log('Error clearing heartbeat:', error);
+                }
+            })();
+        };
     }, [plugin]);
 
     // Listen for flash signals from the button
