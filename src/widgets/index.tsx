@@ -15,22 +15,24 @@ async function onActivate(plugin: ReactRNPlugin) {
   // Ensure Comment powerup exists
   await ensureCommentPowerup(plugin);
 
-  // Helper function to check if comments widget is actually open
-  const isCommentsWidgetActuallyOpen = async (): Promise<boolean> => {
+  // Helper function to check if comments widget is likely open based on recent heartbeat
+  const isCommentsWidgetLikelyOpen = async (): Promise<boolean> => {
     try {
-      // Try to get information about open widgets
-      // This is a more reliable way to check if the widget is actually open
-      const openWidgets = await plugin.window.getOpenWidgets?.() || [];
-      const isOpen = openWidgets.some((widget: any) => widget.widgetId === 'comments_sidebar');
+      const lastHeartbeat = await plugin.storage.getSession<number>('comments_widget_heartbeat') || 0;
+      const now = Date.now();
+      const timeSinceHeartbeat = now - lastHeartbeat;
       
-      // Update our stored state to match reality
-      await plugin.storage.setSession('comments_widget_open', isOpen);
+      console.log('Last heartbeat:', lastHeartbeat, 'Now:', now, 'Time since heartbeat:', timeSinceHeartbeat);
       
-      return isOpen;
+      // If we got a heartbeat within the last 5 seconds, consider it open
+      // The widget sends a heartbeat every 2 seconds, so 5 seconds gives some buffer
+      const isLikelyOpen = timeSinceHeartbeat < 5000;
+      
+      console.log('Widget likely open based on heartbeat:', isLikelyOpen);
+      
+      return isLikelyOpen;
     } catch (error) {
-      // Fallback: if we can't check, assume it's closed and let the user try
-      console.log('Could not check widget state, assuming closed:', error);
-      await plugin.storage.setSession('comments_widget_open', false);
+      console.log('Error checking heartbeat, assuming closed:', error);
       return false;
     }
   };
@@ -64,12 +66,11 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
 
-      // Check if the widget is actually open (more reliable check)
-      const isActuallyOpen = await isCommentsWidgetActuallyOpen();
-      console.log('Comments actually open:', isActuallyOpen);
+      // Check if the widget is likely open based on recent heartbeat
+      const isLikelyOpen = await isCommentsWidgetLikelyOpen();
 
-      if (isActuallyOpen) {
-        console.log('Comments already open - sending flash signal');
+      if (isLikelyOpen) {
+        console.log('Comments likely open - sending flash signal');
         // Send a flash signal to the Comments widget to provide visual feedback
         await plugin.storage.setSession('comments_flash_signal', Date.now());
         return;
@@ -115,8 +116,8 @@ async function onActivate(plugin: ReactRNPlugin) {
         return;
       }
 
-      const isActuallyOpen = await isCommentsWidgetActuallyOpen();
-      if (isActuallyOpen) {
+      const isLikelyOpen = await isCommentsWidgetLikelyOpen();
+      if (isLikelyOpen) {
         await plugin.storage.setSession('comments_flash_signal', Date.now());
         return;
       }
