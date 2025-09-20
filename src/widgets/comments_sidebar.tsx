@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderWidget, usePlugin, useTracker, AppEvents } from '@remnote/plugin-sdk';
 import { listAllComments } from '../lib/comments';
+import { createBus } from '../utils/bus';
 
 function CommentsSidebar() {
     const plugin = usePlugin();
@@ -45,73 +46,36 @@ function CommentsSidebar() {
         };
     }, [plugin]);
 
+    // Instant ping/pong system for widget detection
     React.useEffect(() => {
-        // Mark Comments widget as open and clear opening flag
-        (async () => {
-            await plugin.storage.setSession('comments_widget_open', true);
-            await plugin.storage.setSession('comments_widget_opening', false);
-        })();
+        const bus = createBus();
+        
+        const onPing = (payload: { requestId?: string } | undefined) => {
+            console.log('Received ping, sending pong with requestId:', payload?.requestId);
+            bus.emit('comments:pong', payload); // echo back requestId
+        };
+        
+        const onFlash = () => {
+            console.log('Received flash request');
+            setIsFlashing(true);
+            setTimeout(() => setIsFlashing(false), 300); // Flash for 300ms
+            bus.emit('comments:didFlash');
+        };
+
+        bus.on('comments:ping', onPing);
+        bus.on('comments:flash', onFlash);
+
+        // Announce readiness as soon as the widget mounts and is ready
+        console.log('Widget ready, announcing readiness');
+        bus.emit('comments:ready');
 
         return () => {
-            // Mark Comments widget as closed when component unmounts
-            (async () => {
-                await plugin.storage.setSession('comments_widget_open', false);
-                await plugin.storage.setSession('comments_widget_opening', false);
-            })();
+            console.log('Widget unmounting, cleaning up bus');
+            bus.off('comments:ping', onPing);
+            bus.off('comments:flash', onFlash);
+            bus.close();
         };
-    }, [plugin]);
-
-    // Heartbeat system - send periodic heartbeats to indicate the widget is alive
-    React.useEffect(() => {
-        const sendHeartbeat = async () => {
-            try {
-                const now = Date.now();
-                await plugin.storage.setSession('comments_widget_heartbeat', now);
-                console.log('Heartbeat sent:', now);
-            } catch (error) {
-                console.log('Heartbeat error:', error);
-            }
-        };
-
-        // Send initial heartbeat
-        sendHeartbeat();
-
-        // Send heartbeat every 2 seconds
-        const heartbeatInterval = setInterval(sendHeartbeat, 2000);
-
-        return () => {
-            clearInterval(heartbeatInterval);
-            // Clear heartbeat when component unmounts so button knows widget is gone
-            (async () => {
-                try {
-                    await plugin.storage.setSession('comments_widget_heartbeat', 0);
-                } catch (error) {
-                    console.log('Error clearing heartbeat:', error);
-                }
-            })();
-        };
-    }, [plugin]);
-
-    // Listen for flash signals from the button
-    React.useEffect(() => {
-        let lastFlashTime = 0;
-
-        const checkFlashSignal = async () => {
-            const flashSignal = await plugin.storage.getSession<number>('comments_flash_signal');
-            if (flashSignal && flashSignal > lastFlashTime) {
-                lastFlashTime = flashSignal;
-                setIsFlashing(true);
-                setTimeout(() => setIsFlashing(false), 300); // Flash for 300ms
-            }
-        };
-
-        // Check for flash signal every 100ms
-        const interval = setInterval(checkFlashSignal, 100);
-
-        return () => clearInterval(interval);
-    }, [plugin]);
-
-
+    }, []);
 
     const gotoRem = async (remId?: string) => {
         const id = remId || undefined;
