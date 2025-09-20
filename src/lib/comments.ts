@@ -1,4 +1,5 @@
 import { RNPlugin } from '@remnote/plugin-sdk';
+import { createBus } from '../utils/bus';
 
 export async function ensureCommentPowerup(plugin: RNPlugin) {
     // Idempotently register the Comment powerup with hidden slots for storage
@@ -32,18 +33,48 @@ export async function addComment(plugin: RNPlugin, parentRemId: string, text: st
     await commentRem.setParent(parentRemId);
 
     const pw = await plugin.powerup.getPowerupByCode('comment');
+    const createdAt = new Date().toISOString();
+    
     if (pw?._id) {
         await commentRem.addTag(pw._id);
         await commentRem.setPowerupProperty('comment', 'text', [text]);
-        await commentRem.setPowerupProperty('comment', 'createdAt', [new Date().toISOString()]);
+        await commentRem.setPowerupProperty('comment', 'createdAt', [createdAt]);
         if (author) {
             await commentRem.setPowerupProperty('comment', 'author', [author]);
         }
     }
 
     await plugin.app.toast('Comment added.');
-    // signal list views to refresh
+    
+    // Get parent name for the complete comment data
+    let parentName: string | undefined;
+    if (parentRemId) {
+        const parentRem = await plugin.rem.findOne(parentRemId);
+        if (parentRem) {
+            const parentNameRT = parentRem.text;
+            parentName = await plugin.richText.toString(parentNameRT);
+        }
+    }
+
+    // Create complete comment data to send
+    const newCommentData = {
+        id: commentRem._id,
+        parentId: parentRemId,
+        parentName,
+        text,
+        createdAt
+    };
+
+    // Use event bus to notify view with complete comment data
+    const bus = createBus();
+    bus.emit('comments:updated', { remId: parentRemId, comment: newCommentData });
+    bus.close();
+    
+    // Keep existing notification methods for backward compatibility
     await plugin.storage.setSession('comments_dirty', Date.now());
+    try { 
+        await plugin.messaging.broadcast({ type: 'comments_dirty', ts: Date.now() }); 
+    } catch { }
 }
 
 export type CommentRow = {
@@ -77,4 +108,3 @@ export async function listAllComments(plugin: RNPlugin): Promise<CommentRow[]> {
     }
     return rows;
 }
-
