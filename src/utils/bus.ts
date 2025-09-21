@@ -1,5 +1,28 @@
 type Handler = (payload?: any) => void;
 
+/**
+ * Creates a cross-tab communication bus using either BroadcastChannel (if supported)
+ * or localStorage events as a fallback. Allows subscribing to, emitting, and unsubscribing
+ * from custom event types across browser tabs/windows.
+ *
+ * @param channelName - The name of the communication channel. Defaults to 'remnote-comments-bus'.
+ * @returns An object with methods:
+ *   - `on(type, fn)`: Subscribe to an event type.
+ *   - `off(type, fn)`: Unsubscribe from an event type.
+ *   - `emit(type, payload)`: Emit an event with optional payload.
+ *   - `close()`: Clean up resources and listeners.
+ *
+ * @example
+ * ```typescript
+ * const bus = createBus('my-channel');
+ * bus.on('message', (payload) => console.log(payload));
+ * bus.emit('message', { text: 'Hello!' });
+ * bus.close();
+ * ```
+ *
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/BroadcastChannel BroadcastChannel}
+ * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/Window/storage_event StorageEvent}
+ */
 export function createBus(channelName = 'remnote-comments-bus') {
   const supportsBC = typeof (window as any).BroadcastChannel !== 'undefined';
   const handlers = new Map<string, Set<Handler>>();

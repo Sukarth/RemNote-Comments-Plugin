@@ -7,14 +7,11 @@ const { ESBuildMinifyPlugin } = require('esbuild-loader');
 const { ProvidePlugin, BannerPlugin } = require('webpack');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const ReactRefreshWebpackPlugin = require('@pmmmwh/react-refresh-webpack-plugin');
-
 const CopyPlugin = require('copy-webpack-plugin');
 
 const isProd = process.env.NODE_ENV === 'production';
 const isDevelopment = !isProd;
-
 const fastRefresh = isDevelopment ? new ReactRefreshWebpackPlugin() : null;
-
 const SANDBOX_SUFFIX = '-sandbox';
 
 const config = {
@@ -63,8 +60,8 @@ const config = {
     isDevelopment
       ? undefined
       : new MiniCssExtractPlugin({
-          filename: '[name].css',
-        }),
+        filename: '[name].css',
+      }),
     new HtmlWebpackPlugin({
       templateContent: `
       <body></body>
@@ -109,7 +106,6 @@ if (isProd) {
     minimizer: [new ESBuildMinifyPlugin()],
   };
 } else {
-  // for more information, see https://webpack.js.org/configuration/dev-server
   config.devServer = {
     port: 8080,
     open: true,
@@ -118,9 +114,27 @@ if (isProd) {
     watchFiles: ['src/*'],
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'baggage, sentry-trace',
+      'Access-Control-Allow-Headers': 'baggage, sentry-trace, X-Requested-With, content-type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
+      'Access-Control-Allow-Private-Network': 'true'  // ADD THIS LINE
     },
-  };
+    setupMiddlewares: (middlewares, devServer) => {
+      devServer.app.use('*', (req, res, next) => {
+        if (req.method === 'OPTIONS') {
+          res.header('Access-Control-Allow-Origin', '*');
+          res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+          res.header('Access-Control-Allow-Headers', 'baggage, sentry-trace, X-Requested-With, content-type, Authorization');
+          res.header('Access-Control-Allow-Private-Network', 'true');
+          res.sendStatus(200);
+        } else {
+          next();
+        }
+      });
+      return middlewares;
+    }
+  }
+
+
 }
 
 module.exports = config;

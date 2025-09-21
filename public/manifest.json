@@ -1,13 +1,13 @@
 {
   "manifestVersion": 1,
-  "id": "comments-plugin",
-  "name": "Comments",
+  "id": "remnote-comments-plugin",
+  "name": "Remnote Comments Plugin",
   "author": "Sukarth",
-  "repoUrl": "https://github.com/Sukarth",
+  "repoUrl": "https://github.com/Sukarth/remnote-comments-plugin",
   "version": {
-    "major": 0,
+    "major": 1,
     "minor": 0,
-    "patch": 1
+    "patch": 0
   },
   "theme": [],
   "enableOnMobile": false,
